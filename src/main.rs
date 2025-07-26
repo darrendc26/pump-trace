@@ -1,5 +1,6 @@
 
 mod ingest;
+mod arrow;
 use ingest::ingest_ws_stream;
 
 #[tokio::main]

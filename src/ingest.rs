@@ -1,9 +1,12 @@
+#![allow(non_snake_case)]
+#![allow(dead_code)]
 use tokio_tungstenite::connect_async;
 use futures::{SinkExt, StreamExt};
 use serde::{Deserialize};
 use serde_json::{json};
 use url::Url;
-use tracing::{info, warn, Value};
+use tracing::{info, warn};
+use crate::arrow::event_to_chunk;
 
 #[derive(Debug, Deserialize)]
 // #[serde(tag = "txType")]
@@ -51,25 +54,25 @@ pub async fn ingest_ws_stream() {
     let url = Url::parse("wss://pumpportal.fun/api/data").unwrap();
     let (mut ws_stream, _) = connect_async(url).await.expect("Failed to connect");
 
-    // let sub_msg = json!({
-    //     "method": "subscribeNewToken"
-    // });
-
-    // ws_stream.send(tokio_tungstenite::tungstenite::Message::Text(sub_msg.to_string()))
-    //     .await
-    //     .expect("Failed to send subscription");
-
-    
     let sub_msg = json!({
-        "method": "subscribeTokenTrade",
-        "keys": ["BdNBU4SjC4BuWFQmwwFWcRMfX1Ew78oPBjnkWxbbpump",
-            "6o9xFdWCaqghJNbNJW7VxGJaiRN55WRoqZXzjiYopump"
-        ]
+        "method": "subscribeNewToken"
     });
 
     ws_stream.send(tokio_tungstenite::tungstenite::Message::Text(sub_msg.to_string()))
         .await
         .expect("Failed to send subscription");
+
+    
+    // let sub_msg = json!({
+    //     "method": "subscribeTokenTrade",
+    //     "keys": ["BdNBU4SjC4BuWFQmwwFWcRMfX1Ew78oPBjnkWxbbpump",
+    //         "6o9xFdWCaqghJNbNJW7VxGJaiRN55WRoqZXzjiYopump"
+    //     ]
+    // });
+
+    // ws_stream.send(tokio_tungstenite::tungstenite::Message::Text(sub_msg.to_string()))
+    //     .await
+    //     .expect("Failed to send subscription");
 
 
     let (_, mut read) = ws_stream.split();
@@ -104,8 +107,8 @@ pub async fn ingest_ws_stream() {
                 pool: text_json["pool"].as_str().unwrap_or("").to_string(),
             };
 
-            // Now do something with it
-            println!("Token launch: {:#?}", token);
+            let chunk_result = event_to_chunk(&token);
+            println!("Token launch: {:#?}", chunk_result);
         }
 
         Some("buy") | Some("sell") => {
@@ -123,6 +126,8 @@ pub async fn ingest_ws_stream() {
                 marketCapSol: text_json["marketCapSol"].as_f64().unwrap_or(0.0),
                 pool: text_json["pool"].as_str().unwrap_or("").to_string(),
             };
+
+            let chunk_result = event_to_chunk(&trade);
             println!("Trade: {:#?}", trade);
         }
 

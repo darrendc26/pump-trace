@@ -80,7 +80,7 @@ pub async fn ingest_ws_stream() {
         let text_json: serde_json::Value = match serde_json::from_str(text) {
             Ok(val) => val,
             Err(e) => {
-                warn!("❌ Failed to parse JSON: {:?}\nText: {:?}", e, text);
+                warn!("Failed to parse JSON: {:?}\nText: {:?}", e, text);
                 continue;
             }
         };
@@ -105,7 +105,7 @@ pub async fn ingest_ws_stream() {
             };
 
             // Now do something with it
-            println!("🚀 Token launch: {:#?}", token);
+            println!("Token launch: {:#?}", token);
         }
 
         Some("buy") | Some("sell") => {
@@ -123,11 +123,11 @@ pub async fn ingest_ws_stream() {
                 marketCapSol: text_json["marketCapSol"].as_f64().unwrap_or(0.0),
                 pool: text_json["pool"].as_str().unwrap_or("").to_string(),
             };
-            println!("💸 Trade: {:#?}", trade);
+            println!("Trade: {:#?}", trade);
         }
 
                 Some(other) => {
-                    warn!("❓ Unhandled txType: {}", other);
+                    warn!(" Unhandled txType: {}", other);
                 }
 
                 _ => {
@@ -135,7 +135,7 @@ pub async fn ingest_ws_stream() {
                 }
             }
         } else {
-            info!("ℹ️ Non-event/system message: {}", text);
+            info!(" Non-event/system message: {}", text);
         }
     };
 

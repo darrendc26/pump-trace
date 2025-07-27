@@ -7,6 +7,7 @@ use crate::arrow::event_to_record_batch;
 use serde::{Deserialize};
 use crate::parquet_storage::ParquetStorage;
 use arrow::record_batch::RecordBatch;
+use crate::postgres_db::PumpPostgres;
 
 #[derive(Debug, Deserialize)]
 
@@ -67,7 +68,9 @@ impl PumpPipeline {
     }
 
 
-pub fn process_data(&mut self, text_json: Value) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn process_data(&mut self, text_json: Value) -> Result<(), Box<dyn std::error::Error>> {
+    let postgres = PumpPostgres::new().await.unwrap();
+    postgres.setup_tables().await.unwrap();
      if let Some(tx_type_val) = text_json.get("txType") {
     match tx_type_val.as_str() {
         Some("create") => {
@@ -87,9 +90,20 @@ pub fn process_data(&mut self, text_json: Value) -> Result<(), Box<dyn std::erro
                 uri: text_json["uri"].as_str().unwrap_or("").to_string(),
                 pool: text_json["pool"].as_str().unwrap_or("").to_string(),
             };
+            println!("TokenLaunch: {:?}", token);
+            let batch = match event_to_record_batch(&token){
+                Ok(batch) => {
+                    println!("Converted to batch: {:?}", batch);
+                    batch},
 
-            let batch = event_to_record_batch(&token); 
-            self.launch_buffer.push(batch?);
+                Err(e) => {
+                    warn!("Failed to convert token launch to arrow batch: {:?}", e);
+                    return Err(e.into());
+                }
+            };
+            self.launch_buffer.push(batch);
+           postgres.push_token_launch(&text_json).await.unwrap();
+
             if self.launch_buffer.len() >= self.buffer_size {
                 self.storage.write_batch(&self.launch_buffer, "token_launch")?;
                 self.launch_buffer.clear();
@@ -112,9 +126,10 @@ pub fn process_data(&mut self, text_json: Value) -> Result<(), Box<dyn std::erro
                 marketCapSol: text_json["marketCapSol"].as_f64().unwrap_or(0.0),
                 pool: text_json["pool"].as_str().unwrap_or("").to_string(),
             };
-
+            println!("Trade: {:?}", trade);
             let batch = event_to_record_batch(&trade);
             self.trade_buffer.push(batch?);
+            postgres.push_trade(&text_json).await.unwrap();
 
             if self.trade_buffer.len() >= self.buffer_size {
                 self.storage.write_batch(&self.trade_buffer, "trade")?;
@@ -134,6 +149,15 @@ pub fn process_data(&mut self, text_json: Value) -> Result<(), Box<dyn std::erro
         } else {
             info!(" Non-event/system message");
         }
+        Ok(())
+    }
+
+    pub fn flush_all(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        self.storage.write_batch(&self.launch_buffer, "token_launch")?;
+        self.storage.write_batch(&self.trade_buffer, "trade")?;
+        self.launch_buffer.clear();
+        self.trade_buffer.clear();
+        println!("Flushed all");
         Ok(())
     }
 

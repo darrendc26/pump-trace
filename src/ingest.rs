@@ -6,12 +6,12 @@ use futures::{SinkExt, StreamExt};
 // use serde::{Deserialize};
 use serde_json::{json};
 use url::Url;
-use tracing::{info, warn};
-// use crate::arrow::event_to_record_batch;
+use tracing:: warn;
 use crate::process_data::PumpPipeline;
 
 pub async fn ingest_ws_stream() {
     let mut pipeline = PumpPipeline::new("./pump_data", 2).unwrap();
+    
 
     let url = Url::parse("wss://pumpportal.fun/api/data").unwrap();
     let (mut ws_stream, _) = connect_async(url).await.expect("Failed to connect");
@@ -50,8 +50,8 @@ pub async fn ingest_ws_stream() {
             }
         };
 
-        pipeline.process_data(text_json).expect("Failed to process data");
-
+       pipeline.process_data(text_json.clone()).await.expect("Failed to process data");
     };
 
+    
 }

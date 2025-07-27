@@ -3,7 +3,7 @@ use std::error::Error;
 use serde_json::Value;
 
 pub struct PumpPostgres {
-    pool: PgPool,  // Store the pool, not a client
+    pool: PgPool,  
 }
 
 impl PumpPostgres {
@@ -46,7 +46,30 @@ impl PumpPostgres {
         .execute(&self.pool)
         .await?;
 
-        println!("✅ PostgreSQL tables and indexes created");
+        println!("✅ PostgreSQL token launches tables");
+
+        // Create token trades table
+        sqlx::query("
+            CREATE TABLE IF NOT EXISTS trades (
+                id SERIAL PRIMARY KEY,
+                signature TEXT UNIQUE NOT NULL,
+                mint TEXT NOT NULL,
+                trader_public_key TEXT NOT NULL,
+                tx_type TEXT NOT NULL,
+                token_amount DOUBLE PRECISION NOT NULL,
+                sol_amount DOUBLE PRECISION NOT NULL,
+                new_token_balance DOUBLE PRECISION NOT NULL,
+                bonding_curve_key TEXT NOT NULL,
+                v_tokens_in_bonding_curve DOUBLE PRECISION NOT NULL,
+                v_sol_in_bonding_curve DOUBLE PRECISION NOT NULL,
+                market_cap_sol DOUBLE PRECISION NOT NULL,
+                pool TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT NOW()
+            )")
+        .execute(&self.pool)
+        .await?;
+
+        println!("✅ PostgreSQL Trades tables");
         Ok(())
     }
 

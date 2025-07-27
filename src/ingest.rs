@@ -27,8 +27,8 @@ pub async fn ingest_ws_stream() {
     
     let sub_msg = json!({
         "method": "subscribeTokenTrade",
-        "keys": ["BdNBU4SjC4BuWFQmwwFWcRMfX1Ew78oPBjnkWxbbpump",
-            "6o9xFdWCaqghJNbNJW7VxGJaiRN55WRoqZXzjiYopump"
+        "keys": ["6bfrXdoo8nZFosAER94ihMz7a4rSwu6A8ismAuVtpump",
+            "9BadoUuov35qa2fujLdyqDYgMfCDuWuwDhJQ25yrpump"
         ]
     });
 

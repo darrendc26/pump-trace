@@ -1,14 +1,13 @@
-use arrow2::datatypes::{DataType, Field, Schema};
-use arrow2::array::{Float64Array, Utf8Array};
-use arrow2::error::Result;
-use arrow2::chunk::Chunk;
-use arrow2::array::Array;
-use tracing::event;
+use arrow::datatypes::{DataType, Field, Schema};
+use arrow::array::{Float64Array, StringArray};
+use arrow::record_batch::RecordBatch;
+use arrow::error::Result;
 use std::sync::Arc;
-use crate::ingest::PumpEvent;
+
+use crate::process_data::PumpEvent;
 
 pub fn launch_schema() -> Schema {
-    Schema::from(vec![
+    Schema::new(vec![  // Schema::new, not Schema::from
         Field::new("signature", DataType::Utf8, false),
         Field::new("trader_public_key", DataType::Utf8, false),
         Field::new("tx_type", DataType::Utf8, false),
@@ -27,7 +26,7 @@ pub fn launch_schema() -> Schema {
 }
 
 pub fn trade_schema() -> Schema {
-    Schema::from(vec![
+    Schema::new(vec![
         Field::new("signature", DataType::Utf8, false),
         Field::new("mint", DataType::Utf8, false),
         Field::new("trader_public_key", DataType::Utf8, false),
@@ -43,8 +42,8 @@ pub fn trade_schema() -> Schema {
     ])
 }
 
-// Option 1: Single Event Processing (Recommended)
-pub fn event_to_chunk(event: &PumpEvent) -> Result<(Schema, Chunk<Box<dyn Array>>)> {
+// Single event processing with official arrow
+pub fn event_to_record_batch(event: &PumpEvent) -> Result<RecordBatch> {
     match event {
         PumpEvent::TokenLaunch {
             signature,
@@ -62,24 +61,27 @@ pub fn event_to_chunk(event: &PumpEvent) -> Result<(Schema, Chunk<Box<dyn Array>
             uri,
             pool,
         } => {
-            let schema = launch_schema();
-            let chunk = Chunk::new(vec![
-                Box::new(Utf8Array::<i32>::from([Some(signature.as_str())])) as Box<dyn Array>,
-                Box::new(Utf8Array::<i32>::from([Some(traderPublicKey.as_str())])),
-                Box::new(Utf8Array::<i32>::from([Some(txType.as_str())])),
-                Box::new(Utf8Array::<i32>::from([Some(mint.as_str())])),
-                Box::new(Float64Array::from([Some(*solInPool)])),
-                Box::new(Float64Array::from([Some(*tokensInPool)])),
-                Box::new(Float64Array::from([Some(*initialBuy)])),
-                Box::new(Float64Array::from([Some(*solAmount)])),
-                Box::new(Float64Array::from([Some(*newTokenBalance)])),
-                Box::new(Float64Array::from([Some(*marketCapSol)])),
-                Box::new(Utf8Array::<i32>::from([Some(name.as_str())])),
-                Box::new(Utf8Array::<i32>::from([Some(symbol.as_str())])),
-                Box::new(Utf8Array::<i32>::from([Some(uri.as_str())])),
-                Box::new(Utf8Array::<i32>::from([Some(pool.as_str())])),
-            ]);
-            Ok((schema, chunk))
+            let schema = Arc::new(launch_schema());
+            
+            RecordBatch::try_new(
+                schema,
+                vec![
+                    Arc::new(StringArray::from(vec![signature.as_str()])),
+                    Arc::new(StringArray::from(vec![traderPublicKey.as_str()])),
+                    Arc::new(StringArray::from(vec![txType.as_str()])),
+                    Arc::new(StringArray::from(vec![mint.as_str()])),
+                    Arc::new(Float64Array::from(vec![*solInPool])),
+                    Arc::new(Float64Array::from(vec![*tokensInPool])),
+                    Arc::new(Float64Array::from(vec![*initialBuy])),
+                    Arc::new(Float64Array::from(vec![*solAmount])),
+                    Arc::new(Float64Array::from(vec![*newTokenBalance])),
+                    Arc::new(Float64Array::from(vec![*marketCapSol])),
+                    Arc::new(StringArray::from(vec![name.as_str()])),
+                    Arc::new(StringArray::from(vec![symbol.as_str()])),
+                    Arc::new(StringArray::from(vec![uri.as_str()])),
+                    Arc::new(StringArray::from(vec![pool.as_str()])),
+                ],
+            )
         }
         
         PumpEvent::Trade {
@@ -96,26 +98,29 @@ pub fn event_to_chunk(event: &PumpEvent) -> Result<(Schema, Chunk<Box<dyn Array>
             marketCapSol,
             pool,
         } => {
-            let schema = trade_schema();
-            let chunk = Chunk::new(vec![
-                Box::new(Utf8Array::<i32>::from([Some(signature.as_str())])) as Box<dyn Array>,
-                Box::new(Utf8Array::<i32>::from([Some(mint.as_str())])),
-                Box::new(Utf8Array::<i32>::from([Some(traderPublicKey.as_str())])),
-                Box::new(Utf8Array::<i32>::from([Some(txType.as_str())])),
-                Box::new(Float64Array::from([Some(*tokenAmount)])),
-                Box::new(Float64Array::from([Some(*solAmount)])),
-                Box::new(Float64Array::from([Some(*newTokenBalance)])),
-                Box::new(Utf8Array::<i32>::from([Some(bondingCurveKey.as_str())])),
-                Box::new(Float64Array::from([Some(*vTokensInBondingCurve)])),
-                Box::new(Float64Array::from([Some(*vSolInBondingCurve)])),
-                Box::new(Float64Array::from([Some(*marketCapSol)])),
-                Box::new(Utf8Array::<i32>::from([Some(pool.as_str())])),
-            ]);
-            Ok((schema, chunk))
+            let schema = Arc::new(trade_schema());
+            
+            RecordBatch::try_new(
+                schema,
+                vec![
+                    Arc::new(StringArray::from(vec![signature.as_str()])),
+                    Arc::new(StringArray::from(vec![mint.as_str()])),
+                    Arc::new(StringArray::from(vec![traderPublicKey.as_str()])),
+                    Arc::new(StringArray::from(vec![txType.as_str()])),
+                    Arc::new(Float64Array::from(vec![*tokenAmount])),
+                    Arc::new(Float64Array::from(vec![*solAmount])),
+                    Arc::new(Float64Array::from(vec![*newTokenBalance])),
+                    Arc::new(StringArray::from(vec![bondingCurveKey.as_str()])),
+                    Arc::new(Float64Array::from(vec![*vTokensInBondingCurve])),
+                    Arc::new(Float64Array::from(vec![*vSolInBondingCurve])),
+                    Arc::new(Float64Array::from(vec![*marketCapSol])),
+                    Arc::new(StringArray::from(vec![pool.as_str()])),
+                ],
+            )
         }
         
         PumpEvent::Unknown => {
-            Err(arrow2::error::Error::InvalidArgumentError(
+            Err(arrow::error::ArrowError::InvalidArgumentError(
                 "Cannot convert Unknown event type to Arrow format".to_string()
             ))
         }
